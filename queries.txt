@@ -1,0 +1,107 @@
+1. What are the movies that families  watching?
+	SELECT 
+		f.title AS "Film Title",
+		c.name AS "Category Name",
+		COUNT(r.rental_id) AS "Count of Rentals"
+	FROM 
+		film AS f
+	JOIN 
+		film_category AS fc ON f.film_id = fc.film_id
+	JOIN 
+		category AS c ON fc.category_id = c.category_id
+	JOIN 
+		inventory AS i ON f.film_id = i.film_id
+	JOIN 
+		rental AS r ON i.inventory_id = r.inventory_id
+	WHERE 
+		c.name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+	GROUP BY 
+		f.title, c.name
+	ORDER BY 
+		c.name, f.title;
+		
+		
+2.	Can you provide a table with the movie titles and divide them into 4 levels (first_quarter, second_quarter, third_quarter, and final_quarter) based on the quartiles (25%, 50%, 75%) of the average rental duration(in the number of days) for movies across all categories?
+
+	WITH movie_rental_duration AS (
+		SELECT 
+			f.title AS "title",
+			c.name AS "name",
+			f.rental_duration AS "rental_duration"
+		FROM 
+			film AS f
+		JOIN 
+			film_category AS fc ON f.film_id = fc.film_id
+		JOIN 
+			category AS c ON fc.category_id = c.category_id
+	)
+	, quartiles AS (
+		SELECT 
+			title, 
+			name,
+			rental_duration,
+			NTILE(4) OVER (ORDER BY rental_duration) AS standard_quartile
+		FROM 
+			movie_rental_duration
+	)
+	SELECT
+		title,
+		name,
+		rental_duration,
+		standard_quartile
+	FROM 
+		quartiles
+	WHERE 
+		name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+	ORDER BY 
+		standard_quartile, title;
+
+3. How do the two stores compare in their count of rental orders for each month across all available years in the dataset?
+	SELECT 
+		s.store_id,
+		EXTRACT(YEAR FROM r.rental_date) AS rental_year,
+		EXTRACT(MONTH FROM r.rental_date) AS rental_month,
+		COUNT(r.rental_id) AS rental_count
+	FROM 
+		rental r
+	JOIN 
+		inventory i ON r.inventory_id = i.inventory_id
+	JOIN 
+		store s ON i.store_id = s.store_id
+	GROUP BY 
+		s.store_id, 
+		EXTRACT(YEAR FROM r.rental_date), 
+		EXTRACT(MONTH FROM r.rental_date)
+	ORDER BY 
+		s.store_id, 
+		rental_year, 
+		rental_month;
+
+4. What are the customer names, the month and year of payment, and the total payment amount for each month for the top 10 paying customers?
+	SELECT 
+		c.first_name || ' ' || c.last_name AS customer_name,
+		TO_CHAR(p.payment_date, 'YYYY-MM') AS month_year,
+		COUNT(1) AS count_payment,
+		SUM(p.amount) AS total_payment
+	FROM 
+		customer c
+	JOIN 
+		payment p ON c.customer_id = p.customer_id
+	WHERE 
+		c.customer_id IN (
+			SELECT 
+				customer_id
+			FROM 
+				payment
+			GROUP BY 
+				customer_id
+			ORDER BY 
+				SUM(amount) DESC
+			LIMIT 10
+		)
+	AND 
+		TO_CHAR(p.payment_date, 'YYYY') = '2007'
+	GROUP BY 
+		customer_name, month_year
+	ORDER BY 
+		customer_name, month_year;
